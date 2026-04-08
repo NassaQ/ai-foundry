@@ -9,7 +9,6 @@ Arabic and English document classification using **Azure OpenAI (GPT-5-nano / GP
 - **Smart excerpt extraction** for long documents (10+ pages)
 - **80% cost reduction** on long documents
 - **85-90% accuracy** on mixed-topic documents
-- Web interface with Streamlit
 - Batch processing support
 - Cost tracking per document
 
@@ -26,7 +25,7 @@ For long documents (>2000 characters), the classifier automatically extracts a s
 
 1. **Install dependencies**:
 ```bash
-pip install openai python-dotenv streamlit pandas tqdm
+pip install openai python-dotenv pandas tqdm
 ```
 
 2. **Configure Azure OpenAI**:
@@ -44,14 +43,6 @@ AZURE_OPENAI_API_VERSION=2025-01-01-preview
 ```
 
 ## Usage
-
-### Web Interface
-
-```bash
-streamlit run app.py --server.port 3000
-```
-
-Open http://localhost:3000
 
 ### Python API
 
@@ -122,7 +113,6 @@ print(results_df[['category', 'confidence', 'cost_usd']])
 ```
 Classification-model/
 ├── azure_openai_classifier.py  # Main classifier (with excerpt extraction)
-├── app.py                       # Streamlit web interface
 ├── .env                         # Configuration (not in git)
 ├── .env.example                 # Configuration template
 └── README.md                    # This file

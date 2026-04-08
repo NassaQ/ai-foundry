@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+documents/
+.ruff_cache/
+.pytest_cache/
+.git/
+.gitignore
+*.md
+uv.lock

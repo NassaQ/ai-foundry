@@ -1,0 +1,23 @@
+[project]
+name = "ai-foundry"
+version = "0.1.0"
+description = "Azure Document Intelligence OCR + Azure OpenAI Classification worker"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "aio-pika>=9.6.1",
+    "aioodbc>=0.5.0",
+    "azure-ai-documentintelligence>=1.0.0",
+    "azure-core>=1.30.0",
+    "azure-servicebus>=7.14.3",
+    "azure-storage-blob>=12.28.0",
+    "fastapi>=0.124.0",
+    "openai>=1.0.0",
+    "pandas>=3.0.2",
+    "pydantic-settings>=2.12.0",
+    "pypdf>=4.0.0",
+    "python-dotenv>=1.0.0",
+    "python-multipart>=0.0.20",
+    "sqlalchemy>=2.0.45",
+    "uvicorn[standard]>=0.38.0",
+]
