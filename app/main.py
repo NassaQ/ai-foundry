@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.logging import logger
 from app.core.storage import BlobDownloader
 from app.core.broker import BaseBroker, AzureServiceBusBroker, RabbitMQBroker
+from app.db.cosmos import CosmosClient
 from app.services.worker import create_message_handler
 
 _WORKER_ROOT = Path(__file__).resolve().parents[1]
@@ -63,10 +64,19 @@ async def lifespan(app: FastAPI):
         container=settings.BLOB_STORAGE_CONTAINER_NAME,
     )
 
+    logger.info("Connecting to Cosmos DB...")
+    cosmos = CosmosClient(
+        conn_str=settings.COSMOS_CONNECTION_STR,
+        db_name=settings.COSMOS_DB_NAME,
+        collection=settings.COSMOS_OCR_COLLECTION,
+    )
+    await cosmos.connect()
+
     handler = create_message_handler(
         ocr_pipeline=ocr_pipeline,
         classifier=classifier,
         blob=blob,
+        cosmos=cosmos,
     )
 
     logger.info(f"Starting consumer on queue: {settings.AI_FOUNDRY_QUEUE_NAME}")
@@ -86,6 +96,7 @@ async def lifespan(app: FastAPI):
         pass
     await broker.close()
     await blob.close()
+    await cosmos.close()
     logger.info("AI Foundry worker shut down cleanly")
 
 

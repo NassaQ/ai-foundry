@@ -21,8 +21,7 @@ FROM python:3.11-slim-bookworm
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     ACCEPT_EULA=Y \
-    PATH="/opt/venv/bin:$PATH" \
-    OUTPUT_DIR="/ai-foundry/documents"
+    PATH="/opt/venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends curl gnupg2 apt-transport-https && \
     curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg && \
@@ -44,9 +43,7 @@ COPY ./app ./app
 COPY ./ocr-model ./ocr-model
 COPY ./Classification-model ./Classification-model
 
-RUN mkdir -p /ai-foundry/documents && chown -R worker:worker /ai-foundry
-
-VOLUME /ai-foundry/documents
+RUN chown -R worker:worker /ai-foundry
 
 USER worker
 

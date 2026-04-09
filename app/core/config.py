@@ -1,4 +1,3 @@
-import os
 from urllib.parse import quote_plus
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -34,8 +33,10 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT_NAME: str = "gpt-4.1-mini"
     AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
 
-    # Output
-    OUTPUT_DIR: str = "documents"
+    # Azure Cosmos DB (MongoDB API)
+    COSMOS_CONNECTION_STR: str
+    COSMOS_DB_NAME: str = "nassaq"
+    COSMOS_OCR_COLLECTION: str = "ocr_results"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
@@ -53,5 +54,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()  # type: ignore
-
-os.makedirs(settings.OUTPUT_DIR, exist_ok=True)
