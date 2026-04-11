@@ -34,13 +34,24 @@ class Settings(BaseSettings):
     AZURE_OPENAI_API_VERSION: str = "2024-12-01-preview"
 
     # Azure Cosmos DB (MongoDB API)
-    COSMOS_CONNECTION_STR: str
-    COSMOS_DB_NAME: str = "nassaq"
+    MONGO_USER: str
+    MONGO_PASS: str
+    MONGO_HOST: str
+    MONGO_DB_NAME: str = "nassaq"
     COSMOS_OCR_COLLECTION: str = "ocr_results"
 
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    @property
+    def MONGO_CONNECTION_STR(self) -> str:
+        encoded_pass = quote_plus(self.MONGO_PASS)
+        return (
+            f"mongodb+srv://{self.MONGO_USER}:{encoded_pass}@{self.MONGO_HOST}"
+            f"/?tls=true&authMechanism=SCRAM-SHA-256"
+            f"&retrywrites=false&maxIdleTimeMS=120000"
+        )
 
     @property
     def SQL_CONNECTION_STRING(self) -> str:

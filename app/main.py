@@ -66,8 +66,8 @@ async def lifespan(app: FastAPI):
 
     logger.info("Connecting to Cosmos DB...")
     cosmos = CosmosClient(
-        conn_str=settings.COSMOS_CONNECTION_STR,
-        db_name=settings.COSMOS_DB_NAME,
+        conn_str=settings.MONGO_CONNECTION_STR,
+        db_name=settings.MONGO_DB_NAME,
         collection=settings.COSMOS_OCR_COLLECTION,
     )
     await cosmos.connect()
