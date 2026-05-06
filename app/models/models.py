@@ -23,12 +23,21 @@ class Base(DeclarativeBase):
 class Documents(Base):
     __tablename__ = "Documents"
     __table_args__ = (
+        ForeignKeyConstraint(["path_id"], ["Virtual_Paths.path_id"], name="FK_Doc_Path"),
+        ForeignKeyConstraint(["uploaded_by_user_id"], ["Users.user_id"], name="FK_Doc_Uploader"),
         PrimaryKeyConstraint("doc_id", name="PK__Document__8AD02924828124C8"),
     )
 
     doc_id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1), primary_key=True)
     filename: Mapped[str] = mapped_column(Unicode(255, "SQL_Latin1_General_CP1_CI_AS"), nullable=False)
+    path_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    uploaded_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
     mongo_doc_id: Mapped[str] = mapped_column(String(36, "SQL_Latin1_General_CP1_CI_AS"), nullable=False)
+    uploaded_at: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False, server_default=text("(getdate())"))
+    updated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime, onupdate=text("(getutcdate())"))
+    file_size: Mapped[Optional[int]] = mapped_column(BigInteger)
+    content_type: Mapped[Optional[str]] = mapped_column(String(100, "SQL_Latin1_General_CP1_CI_AS"))
+    file_type: Mapped[Optional[str]] = mapped_column(String(10, "SQL_Latin1_General_CP1_CI_AS"))
 
     Processing_Status: Mapped[list["ProcessingStatus"]] = relationship("ProcessingStatus", back_populates="doc")
     Ocr_Results: Mapped[list["OcrResult"]] = relationship("OcrResult", back_populates="doc")
