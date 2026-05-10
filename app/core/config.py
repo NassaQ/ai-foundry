@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     MONGO_USER: str
     MONGO_PASS: str
     MONGO_HOST: str
+    MONGO_PORT: int = 10260
     MONGO_DB_NAME: str = "nassaq"
     COSMOS_OCR_COLLECTION: str = "ocr_results"
 
@@ -48,9 +49,9 @@ class Settings(BaseSettings):
     def MONGO_CONNECTION_STR(self) -> str:
         encoded_pass = quote_plus(self.MONGO_PASS)
         return (
-            f"mongodb+srv://{self.MONGO_USER}:{encoded_pass}@{self.MONGO_HOST}"
-            f"/?tls=true&authMechanism=SCRAM-SHA-256"
-            f"&retrywrites=false&maxIdleTimeMS=120000"
+            f"mongodb://{self.MONGO_USER}:{encoded_pass}@{self.MONGO_HOST}:{self.MONGO_PORT}"
+            f"/?ssl=true&tlsInsecure=true&authMechanism=SCRAM-SHA-256"
+            f"&retrywrites=false&maxIdleTimeMS=120000&serverSelectionTimeoutMS=30000"
         )
 
     @property

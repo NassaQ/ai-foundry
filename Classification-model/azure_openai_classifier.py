@@ -6,7 +6,7 @@ import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 import pandas as pd
-from openai import AzureOpenAI
+from openai import OpenAI
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -107,10 +107,9 @@ Examples (analyze keywords carefully):
                     "- AZURE_OPENAI_DEPLOYMENT_NAME"
                 )
             
-            self.client = AzureOpenAI(
+            self.client = OpenAI(
                 api_key=self.api_key,
-                azure_endpoint=self.endpoint,
-                api_version=self.api_version
+                base_url=self.endpoint,
             )
             
             self.input_cost = 0.00015

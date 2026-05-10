@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.core.logging import logger
-from app.core.storage import BlobDownloader
+from app.core.storage import BlobStorage
 from app.core.broker import BaseBroker, AzureServiceBusBroker, RabbitMQBroker
 from app.db.cosmos import CosmosClient
 from app.services.worker import create_message_handler
@@ -59,7 +59,7 @@ async def lifespan(app: FastAPI):
     await broker.connect()
     logger.info("Message broker connected")
 
-    blob = BlobDownloader(
+    blob = BlobStorage(
         conn_str=settings.BLOB_CONNECTION_STR,
         container=settings.BLOB_STORAGE_CONTAINER_NAME,
     )

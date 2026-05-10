@@ -7,7 +7,7 @@ from pymongo.errors import PyMongoError
 from sqlalchemy.exc import OperationalError
 
 from app.core.logging import logger
-from app.core.storage import BlobDownloader
+from app.core.storage import BlobStorage
 from app.core.config import settings
 from app.db.cosmos import CosmosClient
 from app.db.session import AsyncSessionLocal
@@ -63,7 +63,7 @@ async def cosmos_operation_with_retry(operation: Callable, *args, **kwargs):
     raise last_exception
 
 
-async def blob_download_with_retry(blob: BlobDownloader, file_path: str) -> bytes:
+async def blob_download_with_retry(blob: BlobStorage, file_path: str) -> bytes:
     last_exception = None
 
     for attempt in range(1, settings.SQL_MAX_RETRIES + 1):
@@ -169,7 +169,7 @@ async def process_document(
     message: dict,
     ocr_pipeline,
     classifier,
-    blob: BlobDownloader,
+    blob: BlobStorage,
     cosmos: CosmosClient,
 ):
     doc_id = message["doc_id"]
@@ -241,6 +241,27 @@ async def process_document(
                 "error": classification_result.error,
             }
 
+            # ── Organize file into category folder ──────────────────────
+            category = classification_result.category
+            if category and category not in ("Uncertain", "Error"):
+                folder_name = category.lower()
+                new_blob_path = f"{folder_name}/{filename}"
+                try:
+                    # Upload the file content to the organized folder
+                    await blob.upload(file_content, new_blob_path)
+                    # Delete the original blob from its old location
+                    await blob.delete(file_path)
+                    # Update the path in the Cosmos DB document
+                    cosmos_doc["blob_path"] = new_blob_path
+                    logger.info(
+                        f"Organized doc_id={doc_id} into folder: {new_blob_path}"
+                    )
+                except Exception as org_err:
+                    logger.warning(
+                        f"Failed to organize doc_id={doc_id} into folder "
+                        f"'{folder_name}': {org_err}"
+                    )
+
         inserted_id = await cosmos_upsert(cosmos, cosmos_doc)
         logger.info(f"Upserted Cosmos document {inserted_id} for doc_id={doc_id}")
 
@@ -257,7 +278,7 @@ async def process_document(
 def create_message_handler(
     ocr_pipeline,
     classifier,
-    blob: BlobDownloader,
+    blob: BlobStorage,
     cosmos: CosmosClient,
 ):
     async def handle_message(message: dict):
