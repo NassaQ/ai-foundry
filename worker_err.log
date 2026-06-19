@@ -1,0 +1,8 @@
+INFO:     Will watch for changes in these directories: ['D:\\NassaQ\\ai-foundry']
+INFO:     Uvicorn running on http://0.0.0.0:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [26756] using WatchFiles
+INFO:     Started server process [13912]
+INFO:     Waiting for application startup.
+C:\Python312\Lib\site-packages\motor\core.py:171: UserWarning: You appear to be connected to a CosmosDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/cosmosdb
+  delegate = self.__delegate_class__(*args, **kwargs)
+INFO:     Application startup complete.

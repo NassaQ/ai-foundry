@@ -81,6 +81,7 @@ class OcrResult(Base):
     avg_confidence: Mapped[float] = mapped_column(Float, nullable=False)
     primary_language: Mapped[str] = mapped_column(String(10, "SQL_Latin1_General_CP1_CI_AS"), nullable=False)
     category: Mapped[Optional[str]] = mapped_column(String(50, "SQL_Latin1_General_CP1_CI_AS"))
+    domain: Mapped[Optional[str]] = mapped_column(String(50, "SQL_Latin1_General_CP1_CI_AS"))
     classification_confidence: Mapped[Optional[float]] = mapped_column(Float)
     cost_usd_ocr: Mapped[float] = mapped_column(Float, nullable=False)
     cost_usd_classification: Mapped[Optional[float]] = mapped_column(Float)

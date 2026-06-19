@@ -141,6 +141,7 @@ async def _insert_ocr_result_sql_inner(
             word_count=ocr_result.word_count,
             avg_confidence=ocr_result.avg_confidence,
             primary_language=ocr_result.primary_language,
+            domain=classification_result.domain if classification_result else None,
             category=classification_result.category if classification_result else None,
             classification_confidence=classification_result.confidence if classification_result else None,
             cost_usd_ocr=ocr_result.cost_usd,
@@ -233,6 +234,7 @@ async def process_document(
 
         if classification_result:
             cosmos_doc["classification"] = {
+                "domain": classification_result.domain,
                 "category": classification_result.category,
                 "confidence": classification_result.confidence,
                 "reasoning": classification_result.reasoning,
@@ -241,10 +243,11 @@ async def process_document(
                 "error": classification_result.error,
             }
 
-            # ── Organize file into category folder ──────────────────────
+            # ── Organize file into domain/category folder ─────────────
+            domain = classification_result.domain
             category = classification_result.category
-            if category and category not in ("Uncertain", "Error"):
-                folder_name = category.lower()
+            if domain and category and category not in ("Uncertain", "Error") and domain not in ("Error",):
+                folder_name = f"{domain.lower()}/{category.lower()}"
                 new_blob_path = f"{folder_name}/{filename}"
                 try:
                     # Upload the file content to the organized folder

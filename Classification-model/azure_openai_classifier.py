@@ -6,7 +6,7 @@ import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 import pandas as pd
-from openai import OpenAI
+from openai import AzureOpenAI
 from dotenv import load_dotenv
 from tqdm import tqdm
 
@@ -15,6 +15,7 @@ load_dotenv()
 
 @dataclass
 class ClassificationResult:
+    domain: str
     category: str
     confidence: float
     reasoning: str
@@ -27,45 +28,35 @@ class LLMClassifier:
     """Document classifier using Azure OpenAI with few-shot prompting."""
     
     CATEGORIES = {
-        "Culture": "Arts, museums, heritage, literature, entertainment, cultural events",
-        "Finance": "Economy, stocks, banking, business, trade, financial markets",
-        "Medical": "Health, medicine, hospitals, diseases, treatments, healthcare",
-        "Politics": "Government, diplomacy, elections, international relations, policy",
-        "Religion": "Religious topics, sermons, Islamic studies, faith matters",
-        "Sports": "Games, tournaments, athletes, teams, competitions, fitness",
-        "Technology": "Tech companies, innovation, software, AI, digital transformation"
+        "Law": {
+            "Contracts": "Agreements, terms, parties, obligations, clauses, signatures (commercial, employment, lease, NDA)",
+            "Litigation": "Lawsuits, claims, plaintiffs, defendants, petitions, appeals, motions, complaints",
+            "Court Rulings": "Judgments, verdicts, court decisions, judicial opinions, sentences, orders",
+            "Legislation": "Statutes, regulations, codes, legislative acts, amendments, articles of law",
+            "Legal Opinions": "Advisory opinions, legal memos, counsel guidance, fatwas, attorney guidance",
+        }
     }
     
     FEW_SHOT_EXAMPLES = """
-Examples (analyze keywords carefully):
+Examples (analyze domain AND sub-category keywords):
 
-[Finance] "ارتفعت أسعار الأسهم في بورصة دبي" → Keywords: أسعار، أسهم، بورصة
-[Finance] "البنك المركزي رفع أسعار الفائدة" → Keywords: بنك، فائدة
-[Finance] "انخفاض قيمة العملة المحلية" → Keywords: عملة، انخفاض
+[Law > Contracts] "وقّع الطرفان عقد شراكة تجارية وفقاً لأحكام القانون المدني" → Keywords: عقد، طرفان، شراكة
+[Law > Contracts] "The parties executed a non-disclosure agreement with standard indemnification clauses" → Keywords: agreement, parties, clauses, executed
 
-[Sports] "فاز المنتخب الوطني بكأس البطولة" → Keywords: منتخب، كأس، فاز
-[Sports] "اللاعب سجل هدفين في المباراة" → Keywords: لاعب، هدف، مباراة
-[Sports] "الفريق احتل المركز الأول" → Keywords: فريق، مركز
+[Law > Litigation] "رفع المحامي دعوى تعويض أمام المحكمة الابتدائية ضد الشركة" → Keywords: محامي، دعوى، محكمة، تعويض
+[Law > Litigation] "The plaintiff filed a class-action lawsuit alleging securities fraud and breach of fiduciary duty" → Keywords: plaintiff, lawsuit, complaint, filed
 
-[Medical] "أعلنت وزارة الصحة عن لقاح جديد" → Keywords: صحة، لقاح
-[Medical] "دراسة طبية عن علاج السكري" → Keywords: طبية، علاج، سكري
-[Medical] "المستشفى افتتح قسم الطوارئ" → Keywords: مستشفى، طوارئ
+[Law > Court Rulings] "أصدرت المحكمة الدستورية العليا حكماً بعدم دستورية المادة الثانية من القانون" → Keywords: محكمة، حكم، دستورية، مادة
+[Law > Court Rulings] "The Supreme Court delivered a landmark ruling on patent eligibility and prior art" → Keywords: Court, ruling, judgment, Supreme Court
 
-[Technology] "Apple unveiled new iPhone 15" → Keywords: Apple, iPhone, tech company
-[Technology] "AI startup raised $10M funding" → Keywords: AI, startup, tech
-[Technology] "Software update fixes security bug" → Keywords: software, update, security
+[Law > Legislation] "نشرت الجريدة الرسمية قانون العمل الجديد رقم 12 لسنة 2024 المعدل للائحة" → Keywords: قانون، لائحة، رسمية، مادة
+[Law > Legislation] "The Data Protection Act 2024 introduces new compliance requirements for processors" → Keywords: Act, regulation, compliance, law
 
-[Politics] "اجتماع وزراء الخارجية في القمة" → Keywords: وزراء، خارجية، قمة
-[Politics] "الحكومة أصدرت قرارات جديدة" → Keywords: حكومة، قرارات
+[Law > Legal Opinions] "أصدر مجلس الدولة فتوى قانونية بشأن نزاع عقود التعيينات الحكومية" → Keywords: فتوى، قانونية، مجلس، استشارة
+[Law > Legal Opinions] "The Attorney General issued a formal legal opinion on the constitutionality of the proposed treaty" → Keywords: legal opinion, Attorney General, counsel
 
-[Culture] "المتحف يعرض لوحات فنية نادرة" → Keywords: متحف، فنية، لوحات
-[Culture] "مهرجان الموسيقى العربية" → Keywords: مهرجان، موسيقى
-
-[Religion] "خطبة الجمعة في المسجد الكبير" → Keywords: خطبة، جمعة، مسجد
-[Religion] "احتفالات العيد في الكنيسة" → Keywords: عيد، كنيسة
-
-[Uncertain] "The weather is nice today" → No domain keywords
-[Uncertain] "I had breakfast this morning" → Generic, no category fit
+[Uncertain] "The weather is nice today and the sun is shining" → No legal keywords
+[Uncertain] "I had breakfast this morning with friends" → Generic, no category fit
 """
     
     def __init__(
@@ -107,9 +98,10 @@ Examples (analyze keywords carefully):
                     "- AZURE_OPENAI_DEPLOYMENT_NAME"
                 )
             
-            self.client = OpenAI(
+            self.client = AzureOpenAI(
                 api_key=self.api_key,
-                base_url=self.endpoint,
+                azure_endpoint=self.endpoint,
+                api_version=self.api_version,
             )
             
             self.input_cost = 0.00015
@@ -171,47 +163,49 @@ Examples (analyze keywords carefully):
         return '\n'.join(excerpt_parts)
     
     def _build_prompt(self, text: str, is_excerpt: bool = False) -> str:
-        categories_text = "\n".join([
-            f"- {cat} ({desc})" 
-            for cat, desc in self.CATEGORIES.items()
-        ])
+        categories_text = ""
+        for domain_name, sub_cats in self.CATEGORIES.items():
+            for cat, desc in sub_cats.items():
+                categories_text += f"- {domain_name} > {cat} ({desc})\n"
         
         if is_excerpt:
             purpose_guidance = """
 FOCUS ON DOCUMENT PURPOSE (not just keywords mentioned):
-- "Report about developing AI for medical imaging" → Technology (about AI development)
-- "Patient medical diagnosis report" → Medical (about patient health)
-- "Financial analysis of a hospital" → Finance (about financial analysis)
-- "Contract for medical equipment" → Finance/Legal (it's a contract)
+- "Article about legal AI tools for contract review" → Law > Technology-related but the document is ABOUT legal work → Law > Legal Opinions
+- "News article about a famous court case" → Law > Court Rulings (document describes a ruling)
+- "Contract template for hospital equipment purchase" → Law > Contracts (it's a contract, the hospital context is incidental)
 """
         else:
             purpose_guidance = ""
         
-        prompt = f"""You are an expert document classifier for Arabic and English documents.
+        prompt = f"""You are an expert legal document classifier for Arabic and English documents.
 
-Classify the following document into ONE of these categories:
+Classify the following document into ONE domain and ONE sub-category:
 {categories_text}
 
 {self.FEW_SHOT_EXAMPLES}
 {purpose_guidance}
 CLASSIFICATION STRATEGY:
-1. Identify domain keywords (بورصة→Finance, منتخب→Sports, مستشفى→Medical, etc.)
-2. If keywords clearly indicate a category → classify with 70-90% confidence
-3. Only use "Uncertain" if NO domain keywords found (weather, personal chat, etc.)
+1. Check if the document primarily concerns legal matters (عقد→Contracts, محكمة→Litigation/Rulings, قانون→Legislation, فتوى→Legal Opinions, court→Rulings, contract→Contracts, etc.)
+2. Identify the specific legal sub-category based on content
+3. If the document clearly falls under Law but the sub-category is ambiguous, pick the most likely one
+4. Only use "Uncertain" if the document has NO legal content whatsoever (weather, personal chat, recipes, etc.)
+5. Confidence: 70-90% for clear cases, 50-70% for ambiguous ones
 
 Document to classify:
 \"\"\"{text}\"\"\"
 
 Respond ONLY with a JSON object in this EXACT format (no additional text before or after):
-{{"category": "CategoryName", "confidence": 0.XX, "reasoning": "Mention KEY WORDS that led to decision"}}
+{{"domain": "Law", "category": "CategoryName", "confidence": 0.XX, "reasoning": "Mention KEY WORDS that led to decision"}}
 
 Rules:
-- category: Must be one of: Culture, Finance, Medical, Politics, Religion, Sports, Technology, Uncertain
+- domain: Must be one of: Law
+- category: Must be one of: Contracts, Litigation, Court Rulings, Legislation, Legal Opinions, Uncertain
 - confidence: Number between 0.0 and 1.0 (be realistic - not everything is 95%)
-- reasoning: Brief explanation (1-2 sentences)
+- reasoning: Brief explanation (1-2 sentences) citing specific keywords
 - Output ONLY JSON object
 
-IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong category!"""
+IMPORTANT: For legal documents, always use domain "Law". Only use category "Uncertain" if the document is NOT legal at all!"""
         
         return prompt
     
@@ -224,6 +218,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
     ) -> ClassificationResult:
         if not text or not text.strip():
             return ClassificationResult(
+                domain="Error",
                 category="Error",
                 confidence=0.0,
                 reasoning="Empty document provided",
@@ -291,11 +286,17 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
                     (response.usage.completion_tokens / 1000) * self.output_cost
                 )
                 
-                if result_dict.get("category") not in self.CATEGORIES:
-                    result_dict["category"] = "Uncertain"
+                domain = result_dict.get("domain", "Law")
+                if domain not in self.CATEGORIES:
+                    domain = "Law"
+                
+                category = result_dict.get("category", "Uncertain")
+                if domain in self.CATEGORIES and category not in self.CATEGORIES[domain]:
+                    category = "Uncertain"
                 
                 return ClassificationResult(
-                    category=result_dict.get("category", "Uncertain"),
+                    domain=domain,
+                    category=category,
                     confidence=float(result_dict.get("confidence", 0.5)),
                     reasoning=result_dict.get("reasoning", ""),
                     tokens_used=tokens_used,
@@ -306,6 +307,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
                 error_msg = f"Failed to parse JSON response: {e}"
                 if attempt == max_retries - 1:
                     return ClassificationResult(
+                        domain="Error",
                         category="Error",
                         confidence=0.0,
                         reasoning=error_msg,
@@ -319,6 +321,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
                 error_msg = f"Classification failed: {str(e)}"
                 if attempt == max_retries - 1:
                     return ClassificationResult(
+                        domain="Error",
                         category="Error",
                         confidence=0.0,
                         reasoning=error_msg,
@@ -329,6 +332,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
                 time.sleep(2 ** attempt)
         
         return ClassificationResult(
+            domain="Error",
             category="Error",
             confidence=0.0,
             reasoning="Max retries exceeded",
@@ -340,11 +344,18 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
     def _parse_text_response(self, content: str) -> Dict:
         import re
         
+        domain = "Law"
         category = "Uncertain"
         confidence = 0.5
         
         content_lower = content.lower()
-        for cat in self.CATEGORIES.keys():
+        
+        all_sub_cats = []
+        for domain_name, sub_cats in self.CATEGORIES.items():
+            for cat in sub_cats.keys():
+                all_sub_cats.append(cat)
+        
+        for cat in all_sub_cats:
             patterns = [
                 rf'\b{cat.lower()}\b',
                 rf'\[{cat.lower()}\]',
@@ -356,6 +367,12 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
                     break
             if category != "Uncertain":
                 break
+        
+        dom_match = re.search(r'domain["\s:]*["\']?([A-Za-z]+)["\']?', content)
+        if dom_match:
+            domain = dom_match.group(1).capitalize()
+            if domain not in self.CATEGORIES:
+                domain = "Law"
         
         conf_patterns = [
             r'"confidence"["\s:]+(\d+\.?\d*)',
@@ -385,6 +402,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
             reasoning = content[:200].strip()
         
         return {
+            "domain": domain,
             "category": category,
             "confidence": confidence,
             "reasoning": reasoning
@@ -392,9 +410,10 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
     
     def _find_closest_category(self, category: str) -> str:
         category_lower = category.lower()
-        for valid_cat in self.CATEGORIES.keys():
-            if category_lower in valid_cat.lower() or valid_cat.lower() in category_lower:
-                return valid_cat
+        for domain_name, sub_cats in self.CATEGORIES.items():
+            for valid_cat in sub_cats.keys():
+                if category_lower in valid_cat.lower() or valid_cat.lower() in category_lower:
+                    return valid_cat
         return "Uncertain"
     
     def classify_batch(
@@ -421,6 +440,7 @@ IMPORTANT: If no category fits clearly, use "Uncertain" - don't force a wrong ca
             result = self.classify(text)
             results.append({
                 'text': text[:100] + "..." if len(text) > 100 else text,
+                'domain': result.domain,
                 'category': result.category,
                 'confidence': result.confidence,
                 'reasoning': result.reasoning,
